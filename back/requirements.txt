@@ -1,0 +1,7 @@
+transformers>=4.40
+accelerate
+peft
+datasets
+bitsandbytes
+torch
+safetensors
