@@ -5,9 +5,9 @@ import os
 
 app = FastAPI()
 
-# Твой Hugging Face API токен (создай на https://huggingface.co/settings/tokens)
-HF_API_TOKEN = os.environ.get("HF_API_TOKEN")  # безопасно хранить в переменных окружения
-HF_MODEL = "OpenAssistant/gpt-oss-7b"  # пример модели OSS на Hugging Face
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN")  # токен из переменных окружения
+HF_MODEL = os.environ.get("HF_MODEL", "facebook/bart-large-cnn")
+
 
 headers = {
     "Authorization": f"Bearer {HF_API_TOKEN}"
@@ -16,11 +16,11 @@ headers = {
 class GenerateRequest(BaseModel):
     character: str
     topic: str
-    length: int = 150  # максимальное количество токенов
+    length: int = 150  # по умолчанию
 
 @app.post("/generate")
 async def generate_text(req: GenerateRequest):
-    # Формируем prompt для персонажа
+    # формируем промпт
     prompt = (
         f"Персонаж: '{req.character}'\n"
         f"Тема: '{req.topic}'\n"
@@ -28,26 +28,36 @@ async def generate_text(req: GenerateRequest):
         "(hook, 2-3 шага, call-to-action)."
     )
 
-    # Запрос к Hugging Face Inference API
+    # формируем payload с параметрами
     payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": req.length,
-            "do_sample": True,
-            "temperature": 0.8,
-            "top_p": 0.95
-        }
+    "inputs": prompt,
+    "parameters": {
+        "max_new_tokens": req.length,
+        "do_sample": True,
+        "temperature": 0.8,
+        "top_p": 0.95
     }
+}
 
     response = requests.post(
         f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-        headers=headers,
-        json=payload
-    )
+        headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
+        json=payload  # <--- вот здесь исправил
+)
+
 
     if response.status_code != 200:
         return {"error": f"Hugging Face API error: {response.text}"}
 
-    generated_text = response.json()[0]["generated_text"]
+    data = response.json()
+    print("DEBUG RESPONSE:", data)  # полезно для отладки
+
+    if isinstance(data, list) and "generated_text" in data[0]:
+        generated_text = data[0]["generated_text"]
+    elif isinstance(data, dict) and "generated_text" in data:
+        generated_text = data["generated_text"]
+    else:
+        generated_text = str(data)
 
     return {"result": generated_text}
+
