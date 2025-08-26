@@ -1,26 +1,26 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 import requests
 import os
 
 app = FastAPI()
 
-HF_API_TOKEN = os.environ.get("HF_API_TOKEN")  # токен из переменных окружения
-HF_MODEL = os.environ.get("HF_MODEL", "facebook/bart-large-cnn")
-
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
+HF_MODEL = "facebook/bart-large-cnn"  
 
 headers = {
-    "Authorization": f"Bearer {HF_API_TOKEN}"
+    "Authorization": f"Bearer {HF_API_TOKEN}",
+    "Content-Type": "application/json"
 }
 
 class GenerateRequest(BaseModel):
     character: str
     topic: str
-    length: int = 150  # по умолчанию
+    length: int = 150  
 
 @app.post("/generate")
 async def generate_text(req: GenerateRequest):
-    # формируем промпт
     prompt = (
         f"Персонаж: '{req.character}'\n"
         f"Тема: '{req.topic}'\n"
@@ -28,36 +28,26 @@ async def generate_text(req: GenerateRequest):
         "(hook, 2-3 шага, call-to-action)."
     )
 
-    # формируем payload с параметрами
-    payload = {
-    "inputs": prompt,
-    "parameters": {
-        "max_new_tokens": req.length,
-        "do_sample": True,
-        "temperature": 0.8,
-        "top_p": 0.95
-    }
-}
+    payload = {"inputs": prompt}
 
     response = requests.post(
         f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-        headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
-        json=payload  # <--- вот здесь исправил
-)
-
+        headers=headers,
+        json=payload
+    )
 
     if response.status_code != 200:
         return {"error": f"Hugging Face API error: {response.text}"}
 
     data = response.json()
-    print("DEBUG RESPONSE:", data)  # полезно для отладки
 
-    if isinstance(data, list) and "generated_text" in data[0]:
-        generated_text = data[0]["generated_text"]
-    elif isinstance(data, dict) and "generated_text" in data:
-        generated_text = data["generated_text"]
+
+    if isinstance(data, list) and "summary_text" in data[0]:
+        result_text = data[0]["summary_text"]
     else:
-        generated_text = str(data)
+        result_text = str(data)
 
-    return {"result": generated_text}
+    return JSONResponse(content={"result": result_text},
+                    media_type="application/json; charset=utf-8")
+
 
