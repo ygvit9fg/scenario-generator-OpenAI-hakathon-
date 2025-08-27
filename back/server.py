@@ -6,8 +6,9 @@ import os
 
 app = FastAPI()
 
+# Меняем модель одной строчкой здесь:
+HF_MODEL = os.environ.get("HF_MODEL", "facebook/bart-large-cnn")  # по умолчанию bart-large-cnn
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
-HF_MODEL = "facebook/bart-large-cnn"  
 
 headers = {
     "Authorization": f"Bearer {HF_API_TOKEN}",
@@ -41,13 +42,10 @@ async def generate_text(req: GenerateRequest):
 
     data = response.json()
 
-
     if isinstance(data, list) and "summary_text" in data[0]:
         result_text = data[0]["summary_text"]
     else:
         result_text = str(data)
 
     return JSONResponse(content={"result": result_text},
-                    media_type="application/json; charset=utf-8")
-
-
+                        media_type="application/json; charset=utf-8")
